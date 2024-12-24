@@ -83,6 +83,7 @@ def export(
             torch_dtype = spec.dtype
         dummy_input[n] = dummy_input[n].to(torch_dtype)
 
+    # 使用 .npz 和对应的 input_metadata 恢复数据
     dummy_input = input_metadata.unflatten_sample(dummy_input)
 
     # torch.onnx.export requires inputs to be a tuple or tensor
@@ -92,6 +93,9 @@ def export(
     forward_argspec = inspect.getfullargspec(model.forward)
     forward_args = forward_argspec.args[1:]
 
+    # 构造 onnx 的 input names
+    # 将 pytree 转换为符合 python 输入的形式
+    # 即前一部分是 位置参数，后一部分是 键值参数
     args_mapping, kwargs_mapping = input_metadata.pytree_metadata.get_names_mapping()
 
     for argname in kwargs_mapping:

@@ -32,7 +32,7 @@ from model_navigator.utils.common import parse_kwargs_to_cmd
 
 class ExportTorch2TorchScript(Command):
     """Command for export PyTorch model to TorchScript.
-
+    功能：根据 model_config 中的配置，调用脚本执行转换。
     Example of use:
         ExportTorch2TorchScript.run(
             workspace="/path/to/working/directory",
@@ -77,7 +77,9 @@ class ExportTorch2TorchScript(Command):
         """
         LOGGER.info("TorchScript export started")
 
+        # 计算导出模型的存储地址
         exported_model_path = workspace.path / path
+        # 如果该地址已经存在，则认为模型已经导出过，跳过
         if exported_model_path.is_file() or exported_model_path.is_dir():
             LOGGER.info("Model already exists. Skipping export.")
             return CommandOutput(status=CommandStatus.SKIPPED)
@@ -87,6 +89,7 @@ class ExportTorch2TorchScript(Command):
         if model is None:
             raise RuntimeError("Expected model of type torch.nn.Module. Got None instead.")
 
+        # 调整模型运行的硬件
         model.to(target_device.value)
 
         exporters.torch2torchscript.get_model = lambda: model
@@ -124,7 +127,7 @@ class ExportTorch2TorchScript(Command):
 
 class ExportTorch2ONNX(Command):
     """Command for export PyTorch model to ONNX.
-
+    功能：根据 model_config 中的配置，调用脚本执行转换。
     Example of use:
 
         ExportTorch2ONNX.run(
@@ -187,12 +190,14 @@ class ExportTorch2ONNX(Command):
         if model is None:
             raise RuntimeError("Expected model of type torch.nn.Module. Got None instead.")
 
+        # 获得 张量的 动态维度
         if dynamic_axes is None:
             dynamic_axes = dict(**input_metadata.dynamic_axes, **output_metadata.dynamic_axes)
             LOGGER.warning(f"No dynamic axes provided. Using values derived from the dataloader: {dynamic_axes}")
         else:
             _validate_if_dynamic_axes_aligns_with_dataloader_shapes(dynamic_axes, input_metadata, output_metadata)
 
+        # 获得模型
         exporters.torch2onnx.get_model = lambda: model
 
         # Keep model on CPU after operation

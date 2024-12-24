@@ -51,6 +51,17 @@ class FetchInputModelData(Command, is_required=True):
             2) conversion samples - samples spanning all dimensions sizes from min to max,
             3) correctness samples - `sample_count` samples for verifying correctness.
 
+        功能：
+        1. 将 dataloader 中选取部分 input sample 保存至本地等待复用。值得注意的是，
+           每个 input sample 仅其中的张量被提取出来，转换为 np.ndarray，并去掉 batch_dim
+           后才被保存，之后可以依靠于 input metadata 进行复原
+
+        2. 其中样本分为三类，分别是 profiling，conversion，以及correctness
+            1. profiling 用作后续推理，如果 optimization_profile 中有 dataloader，则取其第一个
+            2. conversion 用在转换 tensorRT 时使用，要求其中张量尺寸覆盖 min 到 max
+            3. correctness 用于校验步骤，随机选取
+
+
         Args:
             workspace: Workspace of current execution.
             framework: Model framework.
@@ -76,6 +87,8 @@ class FetchInputModelData(Command, is_required=True):
 
         LOGGER.info("Collecting input samples for model.")
         np.random.seed(seed)
+        # 从 dataloader 中选取部分 input 分别作为 correctness、
+        # profiling、coversion 的样本
         correctness_samples_ind = set(np.random.choice(num_samples, size=sample_count, replace=False))
         profiling_sample_ind, conversion_samples_ind = self._collect_samples(
             dataloader,
@@ -100,6 +113,9 @@ class FetchInputModelData(Command, is_required=True):
                 samples = IndiciesFilteredDataloader(optimization_profile.dataloader, [0])
             else:
                 samples = IndiciesFilteredDataloader(dataloader, samples_ind)
+            # 将选定的样本保存到 workspace
+            # 值得注意的是，保存的并不是 input，而是 input 当中的张量数据
+            # 且 batch_dim 上只保留一个数据点
             samples_to_npz(
                 samples,
                 sample_path,
@@ -175,7 +191,9 @@ class FetchOutputModelData(Command, is_required=True):
         raise_on_error: Optional[bool] = True,
     ) -> CommandOutput:
         """Run the command and save model outputs.
-
+        功能：使用 model, input_metadata, output_metadata, runner_cls 以及 runner_config
+        实例化一个 runner。使用 runner 求出 profiling、conversion、correctness
+        这些 samples 的输出并保存到本地备用。
         Args:
             framework: Model framework.
             workspace: Model Navigator workspace path.

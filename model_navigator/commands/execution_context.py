@@ -63,6 +63,10 @@ class ExecutionContext(contextlib.AbstractContextManager):
         on_exit: Optional[Callable] = None,
     ):
         """Initialize the context.
+        功能为：
+        0. 提供执行脚本的接口
+        1. 提供允许指令执行失败的功能
+        2. 复制 script 和 cmd 到workspac中，使得命令可以被单独复现
 
         Args:
             workspace: directory where scripts are created and executed
@@ -130,6 +134,7 @@ class ExecutionContext(contextlib.AbstractContextManager):
         cmd = self._bake_command([sys.executable, script_path_relative.as_posix()] + filtered_args)
         unwrapped_args = self._unwrap_args(args)
 
+        # 如果这个命令可以独立执行，并且启用了多进程，则在单独的子线程执行
         if run_in_isolation and use_multiprocessing():
             child_process = mp.Process(target=self._execute_function, args=(func, unwrapped_args, allow_failure, cmd))
             child_process.start()
@@ -153,6 +158,7 @@ class ExecutionContext(contextlib.AbstractContextManager):
             LOGGER.debug("Running command: {} in the child process: {}", cmd, process_name)
 
         try:
+            # 核心的调用语句
             fire.Fire(func, unwrapped_args)
         except Exception as e:
             cmd_to_reproduce_error = f"Command to reproduce error: {' '.join(cmd)}"

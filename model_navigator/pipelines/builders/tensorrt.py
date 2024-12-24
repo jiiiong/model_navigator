@@ -36,6 +36,7 @@ def tensorrt_conversion_builder(config: CommonConfig, models_config: Dict[Format
     Returns:
         Pipeline with steps for conversion
     """
+    # 如果 tensorRT 不支持，怎直接返回
     if not is_trt_available() or config.target_device != DeviceKind.CUDA:
         return Pipeline(name=PIPELINE_TENSORRT_CONVERSION, execution_units=[])
 

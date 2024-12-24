@@ -184,7 +184,8 @@ def reconfigure_logging_to_file(log_path: pathlib.Path) -> None:
 if current_process().name == "MainProcess":
     # configure main logging system in main process during imports
     # spawn method must be used for windows and because of cuda initialization
-    if (method := mp.get_start_method(allow_none=True)) is None:
+    method = mp.get_start_method(allow_none=True)
+    if method is None:
         mp.set_start_method("spawn")
     elif method == "fork":
         if use_multiprocessing():

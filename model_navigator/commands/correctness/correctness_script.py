@@ -65,6 +65,7 @@ def correctness(
         navigator_workspace = pathlib.Path.cwd()
     navigator_workspace = pathlib.Path(navigator_workspace)
 
+    # 加载 correntcorrectness Sample 的 input 与 output
     correctness_samples = load_samples("correctness_samples", navigator_workspace, batch_dim)
     correctness_samples_output = load_samples("correctness_samples_output", navigator_workspace, batch_dim)
 
@@ -76,6 +77,7 @@ def correctness(
     if runner_config is None:
         runner_config = {}
 
+    # 构建 runner
     input_metadata = TensorMetadata.from_json(input_metadata)
     output_metadata = TensorMetadata.from_json(output_metadata)
     runner = get_runner(runner_name)(
@@ -92,6 +94,7 @@ def correctness(
         for sample, original_output in zip(correctness_samples, correctness_samples_output):
             comp_output = runner.infer(sample)
 
+            # 判断 output 的长度是否一致
             is_len_valid = len(original_output) == len(comp_output)
             if not is_len_valid:
                 LOGGER.error(

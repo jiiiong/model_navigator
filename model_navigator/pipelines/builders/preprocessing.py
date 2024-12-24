@@ -45,11 +45,13 @@ def preprocessing_builder(config: CommonConfig, models_config: Dict[Format, List
     """
     format = FRAMEWORK2BASE_FORMAT[config.framework]
     model_config = models_config[format][0] if models_config[format] else None
+    # 获得能够运行当前 format 的 runner
     runners = get_format_default_runners(format)
 
     execution_units: List[ExecutionUnit] = []
     for runner in runners:
         if config.target_device in runner.devices_kind():
+            # from_source 代表当前没有导入部分处理的 package
             if config.from_source:
                 runner_config = getattr(model_config, "runner_config", None)
                 execution_units.extend([

@@ -159,7 +159,9 @@ def samples_to_npz(
     for i, sample in enumerate(samples):
         if metadata is not None:
             assert framework is not None
+            # 抽取 所有张量数据
             sample = extract_sample(sample, metadata, framework)
+        # 为啥要去除 batch_dim ？
         sample = extract_bs1(sample, batch_dim)
         squeezed_sample = {}
         for name, tensor in sample.items():
@@ -193,7 +195,7 @@ def sample_to_tuple(input: Any) -> Tuple[Any, ...]:
 
 def extract_sample(sample, input_metadata, framework: Framework) -> Sample:
     """Extract samples for inputs.
-
+    这个函数，将 sample 中所有的张量数据提取，并转换为 np.ndarray 格式
     Args:
         sample: A dataloader sample to extract from
         input_metadata: An input metadata

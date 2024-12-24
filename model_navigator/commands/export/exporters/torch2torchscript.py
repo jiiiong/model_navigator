@@ -60,6 +60,7 @@ def export(
         custom_args (Optional[Dict[str, Any]], optional): Passthrough parameters for torch.jit.trace
             For available arguments check PyTorch documentation: https://pytorch.org/docs/stable/jit.html#torch.jit.trace
     """
+    # 准备 model
     model = get_model()
     target_jit_type = JitType(target_jit_type)
 
@@ -67,14 +68,17 @@ def export(
         navigator_workspace = pathlib.Path.cwd()
     navigator_workspace = pathlib.Path(navigator_workspace)
 
+    # 从 workspace 加载 profiling sample
     profiling_sample = load_samples("profiling_sample", navigator_workspace, batch_dim)[0]
     input_metadata = TensorMetadata.from_json(input_metadata)
 
     if target_jit_type == JitType.SCRIPT:
         script_module = torch.jit.script(model)
     else:
+        # 构造为伪输入的张量信息
         dummy_input = {n: torch.from_numpy(val).to(target_device) for n, val in profiling_sample.items()}
 
+        # 修正张量的 dtype
         # adjust input dtypes to match input_metadata
         # TODO: Remove when torch.bfloat16 will be supported
         for n, spec in input_metadata.items():
@@ -84,7 +88,9 @@ def export(
                 torch_dtype = spec.dtype
             dummy_input[n] = dummy_input[n].to(torch_dtype)
 
+        # 使用 pytreeMetadata 从新构造输入
         dummy_input = input_metadata.unflatten_sample(dummy_input, wrap_input=True)
+        #
         if isinstance(dummy_input[-1], dict):
             args, kwargs = dummy_input[:-1], dummy_input[-1]
         else:

@@ -28,7 +28,7 @@ from model_navigator.runners.torch import TorchTensorRTRunner
 
 def torch_tensorrt_conversion_builder(config: CommonConfig, models_config: Dict[Format, List[ModelConfig]]) -> Pipeline:
     """Prepare conversion steps for pipeline.
-
+    将 exportedProgram 转换到 tensorRT
     Args:
         config: A configuration for pipelines
         models_config: List of model configs per format

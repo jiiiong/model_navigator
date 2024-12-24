@@ -136,16 +136,21 @@ def optimize(
     )
 
     builders = [
-        preprocessing_builder,
-        torch_export_builder,
-        find_device_max_batch_size_builder,
-        torch_exportedprogram_builder,
-        torch_dynamo_onnx_builder,
-        torch_conversion_builder,
-        torch_tensorrt_conversion_builder,
-        tensorrt_conversion_builder,
-        correctness_builder,
-        performance_builder,
+        # 推理出 input_metadata 和 output_metadata，
+        # 保存 input_sample 和 output_sample
+        preprocessing_builder, #
+        # 使用 model（model_path）、input/output_metadata、batch_dim、model_config 导出模型
+        torch_export_builder, #
+        # 使用 runner 求出可能的 device max batch size
+        find_device_max_batch_size_builder, #
+        torch_exportedprogram_builder, #
+        torch_dynamo_onnx_builder, #
+        torch_conversion_builder, #
+        torch_tensorrt_conversion_builder, #
+        tensorrt_conversion_builder, #
+        # 使用 runner 进行 Model 的正确性校验与性能采样
+        correctness_builder, #
+        performance_builder, #
     ]
     if verify_func:
         builders.append(verify_builder)

@@ -45,12 +45,12 @@ def find_device_max_batch_size_builder(
         Pipeline with steps for find max batch size.
     """
     execution_units: List[ExecutionUnit] = []
-
     if not do_find_device_max_batch_size(config=config, models_config=models_config):
         return Pipeline(name=PIPELINE_FIND_MAX_BATCH_SIZE, execution_units=execution_units)
 
     if config.framework == Framework.TORCH:
         LOGGER.debug("Preparing find max batch size for Torch.")
+        # 求的 formats 与 runners 的所有合法组合
         configurations = _find_max_batch_size_config_for_torch(config=config, models_config=models_config)
     elif config.framework == Framework.TENSORFLOW:
         LOGGER.debug("Preparing find max batch size for TensorFlow.")
@@ -77,11 +77,13 @@ def find_device_max_batch_size_builder(
 def _find_max_batch_size_config_for_torch(config: CommonConfig, models_config: Dict[Format, List[ModelConfig]]):
     configurations = []
     for model_cfg in models_config.get(Format.TORCH, []):
+        # 找到 target_device 可用的 runner
         runners_cls = {
             DeviceKind.CUDA: [TorchCUDARunner, TorchCompileCUDARunner],
             DeviceKind.CPU: [TorchCPURunner, TorchCompileCPURunner],
         }[config.target_device]
 
+        # 在可用的 runner 中，找到可以运行 format 的那个 runner
         for runner_cls in runners_cls:
             if model_cfg.format != runner_cls.format():
                 raise ModelNavigatorRuntimeError(

@@ -251,7 +251,8 @@ def get_trt_logger() -> "trt.Logger":
 
             def log(self, severity, msg):
                 try:
-                    if log_level := get_log_level(severity):
+                    log_level = get_log_level(severity)
+                    if log_level:
                         logger.log(log_level, msg)
                 except KeyboardInterrupt:
                     # `log()` is `noexcept` so we need to convert exceptions to signals so that

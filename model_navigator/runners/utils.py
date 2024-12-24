@@ -87,6 +87,7 @@ def get_format_default_runners(format: Format) -> List[Type[NavigatorRunner]]:
     if is_source_format(format):
         return get_source_default_runners(format)
     runners = []
+    # 在已经注册的 runners 中找到支持当前 format 的 runner
     for runner_cls in runner_registry.values():
         if runner_cls.format() == format:
             runners.append(runner_cls)

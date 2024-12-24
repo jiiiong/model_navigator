@@ -203,7 +203,7 @@ class ModelConfig(ABC, DataObject):
     def _get_path_params_as_array_of_strings(self) -> List[str]:
         return []
 
-
+# 对于框架直接构建的模型，设置其 parent=None
 class _SourceModelConfig(ModelConfig, format=None):
     """Source model configuration class."""
 
@@ -274,7 +274,7 @@ class JAXModelConfig(_SourceModelConfig, format=Format.JAX):
     def _from_dict(cls, data_dict: Dict):
         return cls()
 
-
+# 对于序列化得到的模型，model config 额外配置序列化所需的参数
 class _SerializedModelConfig(ModelConfig, format=None):
     """Serialized model configuration class."""
 

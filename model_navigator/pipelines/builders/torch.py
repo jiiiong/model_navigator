@@ -48,10 +48,13 @@ def torch_export_builder(config: CommonConfig, models_config: Dict[Format, List[
         Pipeline with steps for export
     """
     execution_units: List[ExecutionUnit] = []
+    # model_config 中保存了转换路径上所有的模型，以及他们的配置
     for model_cfg in models_config.get(Format.TORCHSCRIPT, []):
         execution_units.append(ExecutionUnit(command=ExportTorch2TorchScript, model_config=model_cfg))
 
     for model_cfg in models_config.get(Format.ONNX, []):
+        # ONNX 可能有多种来源，可能是 torch 导出的、可能是源格式、也可能是 torchscript 转换而来的
+        # 目前使用 model_config 中的 parent_path
         if model_cfg.parent_path in (None, Format.TORCH):
             #  If model_path provided in onnx config, copy this onnx instead of exporting.
             if model_cfg.model_path:  # pytype: disable=attribute-error

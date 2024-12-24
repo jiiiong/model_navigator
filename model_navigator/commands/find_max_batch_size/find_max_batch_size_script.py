@@ -72,11 +72,13 @@ def find_max_batch_size(
     if runner_config is None:
         runner_config = {}
 
+    # 准备 model
     if model_path:
         model = navigator_workspace / model_path
     else:
         model = get_model()
 
+    # 准备 runner
     runner = get_runner(runner_name)(
         model=model,
         input_metadata=TensorMetadata.from_json(input_metadata),

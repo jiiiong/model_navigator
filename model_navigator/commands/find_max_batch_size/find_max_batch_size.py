@@ -36,7 +36,9 @@ from model_navigator.utils.format_helpers import is_source_format
 
 @dataclasses.dataclass
 class FindMaxBatchSizeConfig:
-    """Configure pairs of model config and runner to execute."""
+    """Configure pairs of model config and runner to execute.
+
+    """
 
     format: Format
     runner_cls: Type[NavigatorRunner]
@@ -60,7 +62,9 @@ class FindMaxBatchSize(Command):
         runner_config: Optional[Dict] = None,
     ) -> CommandOutput:
         """Execute command.
-
+        功能：基于 当前 framework 的 base formats，在 支持 cuda 的 runner 上搜索 max_device_batch_size
+        用这个 大致的 max_device_batch_size 作为之后 tensorRT 转换时的参考
+        至于为什么有效，不清楚。 TODO
         Args:
             configurations: Configuration to use during search
             workspace: Workspace where artifacts are stored
@@ -75,6 +79,7 @@ class FindMaxBatchSize(Command):
             CommandOutput with status and additional output parameters
         """
         device_max_batch_size = None
+        # 如果 model 不支持批处理
         if batch_dim is None:
             LOGGER.info("Model does not support batching.")
             return CommandOutput(
@@ -82,6 +87,7 @@ class FindMaxBatchSize(Command):
                 output={"device_max_batch_size": device_max_batch_size},
             )
 
+        # 如果 optimization_profile 中已经存在 device 支持的 batch_size 数据，则直接使用
         if optimization_profile.max_batch_size or optimization_profile.batch_sizes:
             if optimization_profile.max_batch_size:
                 device_max_batch_size = optimization_profile.max_batch_size
@@ -94,6 +100,9 @@ class FindMaxBatchSize(Command):
             )
 
         device_max_batch_sizes = []
+        # 求的在不同 format 和 runner 组合的 configuration 下
+        # device 能够支持的最大批处理数
+        # 取其中最大值作为 device_max_batch_size
         for configuration in configurations:
             executor_max_batch_size = self._execute_configuration(
                 workspace=workspace,
@@ -144,6 +153,11 @@ class FindMaxBatchSize(Command):
         path: Optional[pathlib.Path] = None,
         runner_config: Optional[RunnerConfig] = None,
     ):
+        """
+        configuration 包括 模型、runner、等
+        """
+
+        # 校验 model 和 format 的组合是否合法
         if not model and not path:
             raise ModelNavigatorRuntimeError("`mode` or `path` must be provided")
 
@@ -189,6 +203,7 @@ class FindMaxBatchSize(Command):
             cmd_path=reproduction_scripts_dir / f"reproduce_max_batch_size-{runner_cls.slug()}.sh",
             verbose=verbose,
         ) as context, tempfile.NamedTemporaryFile() as temp_file:
+            # 准备脚本参数
             kwargs = {
                 "navigator_workspace": workspace.path.as_posix(),
                 "batch_dim": batch_dim,

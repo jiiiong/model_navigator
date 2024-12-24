@@ -58,7 +58,7 @@ def _extract_axes_shapes(
     axes_shapes = {name: {ax: [] for ax in range(ndim)} for name, ndim in zip(input_names, input_ndims)}
     for i, sample in enumerate(dataloader):
         if i >= num_samples:
-            LOGGER.warning(f"{len(dataloader)=}, but more samples found.")
+            LOGGER.warning(f"len(dataloader)={len(dataloader)}, but more samples found.")
             break
         validate_sample_input(sample, FRAMEWORK_TO_TENSOR_TYPE[framework])
         sample = {n: to_numpy(t, framework) for n, t in pytree_metadata.flatten_sample(sample).items()}
@@ -67,7 +67,7 @@ def _extract_axes_shapes(
                 axes_shapes[name][k].append(dim)
 
     if check_len:
-        assert i + 1 >= len(dataloader), f"{len(dataloader)=}, but only {i + 1} samples found."
+        assert i + 1 >= len(dataloader), f"len(dataloader)={len(dataloader)}, but only {i + 1} samples found."
 
     return axes_shapes
 
@@ -126,7 +126,9 @@ def _assert_all_inputs_have_same_pytree_metadata(
 
 
 class InferInputMetadata(Command, is_required=True):
-    """Command to collect model inputs metadata."""
+    """Command to collect model inputs metadata.
+
+    """
 
     def _run(
         self,
@@ -138,6 +140,18 @@ class InferInputMetadata(Command, is_required=True):
         batch_dim: Optional[int] = None,
     ) -> CommandOutput:
         """Execute the InferInputMetadata command.
+        功能：
+        1. 校验 dataloader 提供的所有 input sample 是否合法，在以下几个方面
+            1. 其数据结构是否是合法的 pytree 结构
+            2. 其中 tensor 的数据类型 framework 是否支持
+            3. 是否 dataloader 中所有的 input samples 具备同样的 pytree 结构
+        2. 构建 input sample 的 metadata，具体包括两部分
+            1. pytree metadata，描述了input sample 的数据结构
+            2. tensor metadata，描述了所有张量的 spec(name, shape, dtype)
+            值得注意的是，pytree metadata 作为 tensor metadata 的一部分被保存
+        3. 柑橘 dataloader 中提供的所有 input samples
+           计算每个 tensor 的动态尺度范围，提供给 trt_profile
+        4. 校验 optimization_profile 中的 dataloader 是否与 参数中的 dataloader 兼容
 
         Args:
             framework: Framework of model to run inference
@@ -150,7 +164,9 @@ class InferInputMetadata(Command, is_required=True):
         Returns:
             CommandOutput object
         """
+        # 从 dataloader 中获取一个 input sample
         sample = next(iter(dataloader))
+        # 校验该 input sample 对于当前框架是否合法，包括检查 tensor 类型
         validate_sample_input(sample, FRAMEWORK_TO_TENSOR_TYPE[framework])
         if framework == Framework.ONNX:
             if _input_names is not None:
@@ -159,12 +175,16 @@ class InferInputMetadata(Command, is_required=True):
         elif framework == Framework.TENSORRT:
             _input_names, _ = get_tensorrt_io_names(model)
 
+        # 构建 dataloader 中 input sample 的 pytreemeta，
+        # 其记录了 input 中不同数据之间的结构，以及 tensor 的类型
         pytree_metadata = PyTreeMetadata.from_sample(
             sample, tensor_type=FRAMEWORK_TO_TENSOR_TYPE[framework], names=_input_names, prefix="input"
         )
+        # 校验是否 dataloader 中全部的 input 都具备相同的 pytreeMetadata
         _assert_all_inputs_have_same_pytree_metadata(dataloader, pytree_metadata)
         input_sample = {}
         input_dtypes = {}
+        # 获得 input sample 中每个张量的规格，包括 name，shape，dtype
         for n, t in pytree_metadata.flatten_sample(sample).items():
             input_sample[n] = to_numpy(t, framework)
 
@@ -180,10 +200,15 @@ class InferInputMetadata(Command, is_required=True):
         axes_shapes = _extract_axes_shapes(
             dataloader, pytree_metadata, input_names, input_ndims, num_samples, framework
         )
+        # 获得 dataloader 中，所有 input sample 中 batch_dim 上最大的尺寸
         dataloader_max_batch_size = _extract_max_batch_size(axes_shapes, batch_dim)
+        # 根据 dataloader 中所有 input sample 实际 shape
+        # 总结出 tensorRT 需要的 dynamic shape
         dataloader_trt_profile = _get_trt_profile_from_axes_shapes(axes_shapes, batch_dim)
         input_metadata = _get_metadata_from_axes_shapes(pytree_metadata, axes_shapes, batch_dim, input_dtypes)
 
+        # 如果 optimization profile 提供了自己的 dataloader
+        # 则需要校验其是否符合 dataloader
         if optimization_profile.dataloader:
             pd_sample = next(iter(optimization_profile.dataloader))
             pd_input_sample = extract_sample(pd_sample, input_metadata, framework)
@@ -228,6 +253,7 @@ class InferInputMetadata(Command, is_required=True):
         batch_dim,
         dataloader_trt_profile,
     ):
+        assert optimization_profile.dataloader != None
         axes_shapes = _extract_axes_shapes(
             dataloader=optimization_profile.dataloader,
             pytree_metadata=pytree_metadata,
@@ -266,6 +292,12 @@ class InferOutputMetadata(Command, is_required=True):
     ) -> CommandOutput:
         """Execute the InferOutputMetadata command.
 
+        功能：
+            使用 model、input_metadata、runner_cls 等构建一个 runner
+            runner 通过处理本地加载的 input sample 求的 outputs，其中：
+            1. profiling_sample 得到的 output 用来求 output 的 pytreemetadata
+            2. conversion_sample 因为覆盖 min 到 max 的动态尺寸范围，
+               其 output 的尺寸用来构建 output 的 metadata
         Args:
             framework: Framework of model to run inference
             model: A model object or path to file
@@ -281,6 +313,8 @@ class InferOutputMetadata(Command, is_required=True):
         Returns:
             CommandOutput object
         """
+        # 预备 output 的 Metadata
+        # 主要是准备好所有张量的 name
         if framework == Framework.ONNX:
             if _output_names is not None:
                 LOGGER.warning("ONNX output names are not supported yet. `output_names` will be ignored.")
@@ -292,6 +326,7 @@ class InferOutputMetadata(Command, is_required=True):
         else:
             temp_output_metadata = None
 
+        # 获得 runner 的配置数据，并初始化 runner
         runner_kwargs = runner_config.to_dict() if runner_config is not None else {}
         runner = runner_cls(
             model=model,
@@ -301,11 +336,16 @@ class InferOutputMetadata(Command, is_required=True):
             **runner_kwargs,
         )
 
+        # 从 workspace 加载 dataloader
+        # FIXME 当时在 sample_as_npz 时，只保留了，张量数据的信息
+        # 完整的 input 还需要 pytreeMetadata 才可以复原
         profiling_sample = load_samples("profiling_sample", workspace.path, batch_dim)[0]
         conversion_samples = load_samples("conversion_sample", workspace.path, batch_dim)
 
         with runner, ExecutionContext(workspace=workspace, verbose=verbose):
+            # 使用 runner 对
             outputs = runner.infer(profiling_sample)
+            # 计算 output 的 pytreeMetada
             pytree_metadata = PyTreeMetadata.from_sample(
                 outputs, tensor_type=FRAMEWORK_TO_TENSOR_TYPE[framework], names=_output_names, prefix="output"
             )
@@ -319,7 +359,7 @@ class InferOutputMetadata(Command, is_required=True):
             axes_shapes = _extract_axes_shapes(
                 output_generator, pytree_metadata, output_names, output_ndims, num_samples, framework, check_len=False
             )
-
+        # 获得 output 的 metadata
         output_metadata = _get_metadata_from_axes_shapes(pytree_metadata, axes_shapes, batch_dim, output_dtypes)
 
         return CommandOutput(

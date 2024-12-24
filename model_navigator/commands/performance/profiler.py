@@ -34,7 +34,10 @@ from model_navigator.runners.base import InferenceStep, NavigatorRunner, Navigat
 
 class Profiler:
     """Runs profiling on a runner a profiling sample.
-
+    功能：
+    1. 本身包含一个 profile 配置，用于控制采样策略
+    2. run 则具体指定一个 runner，以及 profiling sample
+       从而按照相应的 profile strategy 进行性能采样 (profile)
     Example:
         Profiler(
             profile=OptimizationProfile(),
@@ -71,6 +74,7 @@ class Profiler:
         if self._batch_dim is None:
             batch_sizes = [None]
         elif self._profile.max_batch_size:
+            # batch_sizes 中的 size 大小按照指数增长选取
             magnitude = math.floor(math.log2(self._profile.max_batch_size)) + 1
             batch_sizes = set((2 ** np.arange(magnitude, dtype=np.int32)).tolist())
             batch_sizes.add(self._profile.max_batch_size)
@@ -89,7 +93,7 @@ class Profiler:
         sample_id: int,
     ) -> List[ProfilingResults]:
         """Run profiling.
-
+        功能：对一个 runner 进行性能采样
         Args:
             runner: Runner to profile.
             profiling_sample: Sample used for profiling.
@@ -102,16 +106,20 @@ class Profiler:
         prev_results = queue.Queue(maxsize=self._profile.throughput_backoff_limit + 1)
         with runner, NvmlHandler() as nvml_handler:
             try:
+                # 对单个 batch_size 进行 profile
                 for batch_size in self._batch_sizes:
                     LOGGER.debug(f"Performance profiling for {runner.name()} started.")
                     if batch_size:
                         LOGGER.debug(f"Batch size: {batch_size}.")
+                    # 将样本在 batch_dim 展开，FIXME 似乎 expand_sample 存在问题
                     sample = expand_sample(profiling_sample, self._input_metadata, self._batch_dim, batch_size)
+                    # 对 runner 运行 profileing sample 进行性能采样；
                     profiling_result = self._run_measurement(runner, nvml_handler, sample, batch_size, sample_id)
                     LOGGER.debug(
                         f"Performance profiling result for {runner.name()} "
                         f"and batch size: {batch_size}:\n{profiling_result}"
                     )
+                    # 记录采样数据，包括 total_latency, total_steps_latency, steps_coverage 等
                     total_latency = profiling_result.avg_latency
                     total_steps_latency = sum(
                         result.avg_time
@@ -126,6 +134,7 @@ class Profiler:
                     )
                     prev_result = prev_result[0] if len(prev_result) > 0 else None
 
+                    # 吞吐量是否已经饱和
                     if is_throughput_saturated(
                         profiling_result, prev_result, self._profile.throughput_cutoff_threshold
                     ):
@@ -163,6 +172,7 @@ class Profiler:
         batch_size: Optional[int],
         sample_id: int,
     ) -> ProfilingResults:
+        """仅适用于 gpu，一个跑 window_size 此测试"""
         gpu_clocks = []
         measurements = []
         for _ in range(self._profile.window_size):
@@ -191,6 +201,7 @@ class Profiler:
     ) -> ProfilingResults:
         profiling_results = []
 
+        # 如果 runner 有自己的性能采样实现，则使用 runner 提供的
         if runner.is_stabilized():
             assert isinstance(runner, NavigatorStabilizedRunner)
             runner.infer(sample)

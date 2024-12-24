@@ -242,7 +242,9 @@ def is_tensor(tensor: Any, tensor_type: TensorType) -> bool:
 
 
 class PyTreeMetadata:
-    """Description of the metadata of a tree of tensors."""
+    """Description of the metadata of a tree of tensors.
+    实质上记录了一个 input 的结构
+    """
 
     def __init__(self, metadata: Any, tensor_type: TensorType) -> None:
         """Create PyTreeMetadata from provided metadata."""
@@ -332,6 +334,7 @@ class PyTreeMetadata:
     def get_names_mapping(self) -> Tuple[Sequence[Any], Dict[str, Any]]:
         """Get mapping of PyTree metadata to names."""
         metadata = self._metadata
+        # 将 metadata 包裹为 tuple
         if isinstance(metadata, (str, Mapping)):
             metadata = (metadata,)
 
@@ -469,7 +472,11 @@ class PyTreeMetadata:
 
 
 class TensorMetadata(Dict[str, TensorSpec]):
-    """Metadata for inputs/outputs tensors."""
+    """Metadata for inputs/outputs tensors.
+    该数据结构分为两部分，字典和 pytreeMetadata
+    字典中记录了所有张量的 name, (shape, dtype)
+    pytreeMetadata 记录了张量之间的结构
+    """
 
     def __init__(self, *args, pytree_metadata: Optional[PyTreeMetadata] = None, is_legacy: bool = False, **kwargs):
         """Create TensorMetadata object.

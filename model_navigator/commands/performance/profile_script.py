@@ -66,6 +66,7 @@ def profile(
         navigator_workspace = pathlib.Path.cwd()
     navigator_workspace = pathlib.Path(navigator_workspace)
 
+    # 加载样本
     profiling_sample = load_samples("profiler_sample", navigator_workspace, batch_dim)[0]
 
     if model_path:
@@ -76,6 +77,7 @@ def profile(
     if runner_config is None:
         runner_config = {}
 
+    # 创建 runner
     runner = get_runner(runner_name)(
         model=model,
         input_metadata=TensorMetadata.from_json(input_metadata),

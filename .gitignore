@@ -14,6 +14,9 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,direnv,pycharm+all,visualstudiocode,emacs
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,direnv,pycharm+all,visualstudiocode,emacs
 
+#
+examples
+
 ### direnv ###
 .direnv
 .envrc

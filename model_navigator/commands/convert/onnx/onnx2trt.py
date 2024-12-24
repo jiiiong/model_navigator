@@ -36,7 +36,9 @@ from model_navigator.utils.common import parse_kwargs_to_cmd
 
 
 class ConvertONNX2TRT(Convert2TensorRTWithMaxBatchSizeSearch):
-    """Command that converts ONNX checkpoint to TensorRT model plan."""
+    """Command that converts ONNX checkpoint to TensorRT model plan.
+    简单来说就是收集转换需要的参数，然后执行模型转换
+    """
 
     def _run(
         self,
@@ -91,12 +93,14 @@ class ConvertONNX2TRT(Convert2TensorRTWithMaxBatchSizeSearch):
         """
         LOGGER.info("ONNX to TRT conversion started")
 
+        # gpu 是否存在
         if not devices.get_available_gpus():
             raise RuntimeError("No GPUs available.")
 
         input_model_path = workspace.path / parent_path
         converted_model_path = workspace.path / path
 
+        # onnx 模型是否存在
         if not input_model_path.exists():
             LOGGER.warning(f"Exported ONNX model not found at {input_model_path}. Skipping conversion.")
             return CommandOutput(status=CommandStatus.SKIPPED)
@@ -104,6 +108,8 @@ class ConvertONNX2TRT(Convert2TensorRTWithMaxBatchSizeSearch):
 
         onnx_input_names, _ = get_onnx_io_names(onnx_path=input_model_path)
 
+        # 获得 tensorRT 的 profile，一个是从 dataloader 中推断出来的，
+        # 另一个 trt_profiles 不知道是哪儿来的
         def get_args(max_batch_size=None):
             profiles = [
                 self._get_conversion_profiles(
