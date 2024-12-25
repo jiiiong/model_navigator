@@ -107,7 +107,7 @@ class DataObject:
     @staticmethod
     def filter_data(data: Dict, filter_fields: List[str]):
         """Filter fields in dictionary.
-
+        功能：将 字典中，key 处于 filter_fields 中的成员去除
         Args:
             data: Dictionary with data to filter
             filter_fields: Fields to filter

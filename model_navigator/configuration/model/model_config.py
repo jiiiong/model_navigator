@@ -25,6 +25,7 @@ from model_navigator.configuration import (
     TensorRTPrecision,
     TensorRTPrecisionMode,
     TensorRTProfile,
+    MagicMindPrecision,
 )
 from model_navigator.configuration.runner.runner_config import DeviceRunnerConfig, TorchRunnerConfig
 from model_navigator.utils.common import DataObject
@@ -37,6 +38,9 @@ class ModelConfig(ABC, DataObject):
     _subclasses = {}
     format: Format
 
+    ################################################################################
+    ##### 用于使得子类在实例化时，自动设置 format 属性 ################################
+    ################################################################################
     def __init_subclass__(cls, format: Optional[Format], **kwargs):
         """Initializes ModelConfig subclass with format argument and adds it to dictionary.
 
@@ -60,6 +64,9 @@ class ModelConfig(ABC, DataObject):
         instance = super().__new__(cls)
         instance.format = cls.format
         return instance
+
+    # 关键的 属性包括：parent, custom_args
+    # key，path，log_path，parent_key，parent_path 都可以推断出来
 
     def __init__(self, parent: Optional["ModelConfig"], custom_args: Optional[Dict[str, Any]] = None) -> None:
         """Initializes ModelConfig class.
@@ -87,7 +94,10 @@ class ModelConfig(ABC, DataObject):
         return cls._subclasses[Format(data_dict["format"])]._from_dict(data_dict)
 
     def to_dict(self, *_, **__) -> dict:
-        """Returns dictionary representation of the object.
+        """
+        功能：将 modelConfig 实例中的所有属性转换为 jsonale 的字典
+
+        Returns dictionary representation of the object.
 
         Instead of saving parent object, unique parent_path is saved.
 
@@ -101,6 +111,7 @@ class ModelConfig(ABC, DataObject):
             if value is None:
                 continue
 
+            # 将拥有 to_dict 方法的对象转换为 dict 后保存
             if hasattr(value, "to_dict") and not isinstance(value, ModelConfig):
                 params = {**params, **value.to_dict()}
             else:
@@ -118,7 +129,7 @@ class ModelConfig(ABC, DataObject):
 
     def get_config_dict_for_command(self) -> dict:
         """Returns dictionary with ModelConfig data required for Command execution.
-
+        功能：返回执行与 model 相关命令时需要的参数
         Returns:
             Dictionary representation of ModelConfig with unpacked params
         """
@@ -135,7 +146,8 @@ class ModelConfig(ABC, DataObject):
     @property
     def key(self) -> str:
         """Get unique model key.
-
+        Model configs 之间组成一个树形结构
+        key 反应了这种结构
         Returns:
             str: model key.
         """
@@ -236,7 +248,7 @@ class TorchModelConfig(_SourceModelConfig, format=Format.TORCH):
         Args:
             autocast: Enable Automatic Mixed Precision in runner
             inference_mode: Enable inference mode in runner
-            autocast_dtype: dtype used for autocast
+            autocast_dtype: dtype used for autocast 主要针对 bfp16
             device: The target device on which mode has to be loaded
             custom_args: Additional keyword arguments used for model export and conversions
         """
@@ -630,4 +642,61 @@ class TorchTensorRTModelConfig(_SerializedModelConfig, format=Format.TORCH_TRT):
             max_workspace_size=cls._parse_string(int, data_dict.get("max_workspace_size")),
             trt_profiles=trt_profiles,
             device=data_dict.get("device"),
+        )
+
+
+class MagicMindModelConfig(_SerializedModelConfig, format=Format.MAGICMIND):
+    """TensorRT model configuration class."""
+
+    def __init__(
+        self,
+        precision: Optional[MagicMindPrecision] = None,
+        trt_profiles: Optional[List[TensorRTProfile]] = None,
+        parent: Optional[ModelConfig] = None,
+        custom_args: Optional[Dict[str, Any]] = None,
+        device: Optional[str] = None,
+    ) -> None:
+        """Initializes TensorRT (plan) model configuration class.
+
+        Args:
+            parent: Parent model configuration/
+            precision_mode: Mode how the precision flags are combined
+            max_workspace_size: The maximum GPU memory the model can use temporarily during execution
+            optimization_level: Level of TensorRT engine optimization
+            precision: TensorRT model precision
+            trt_profiles: TensorRT profiles
+            compatibility_level: Hardware compatibility level
+            onnx_parser_flags: ONNX parser flags
+            custom_args: Custom arguments passed to TensorRT conversion
+            device: runtime device e.g. "cuda:0"
+            timing_cache_dir: Directory to store timing cache
+            model_path: optional path to trt model file, if provided the model will be loaded from the file instead of converting ONNX to TRT
+        """
+        super().__init__(parent=parent)
+        self.precision = precision
+        self.trt_profiles = trt_profiles
+        self.custom_args = custom_args
+        self.runner_config = DeviceRunnerConfig(device=device)
+
+    def _get_path_params_as_array_of_strings(self) -> List[str]:
+        return [self.precision.value] if self.precision else []
+
+    @classmethod
+    def _from_dict(cls, data_dict: Dict):
+        trt_profiles = data_dict.get("trt_profiles")
+        if trt_profiles is not None:
+            trt_profiles = [TensorRTProfile.from_dict(trt_profile) for trt_profile in trt_profiles]
+        # onnx_parser_flags = data_dict.get("onnx_parser_flags")
+        # if onnx_parser_flags:
+        #     onnx_parser_flags = [int(flag) for flag in onnx_parser_flags]
+        return cls(
+            precision=cls._parse_string(TensorRTPrecision, data_dict.get("precision")),
+            # precision_mode=cls._parse_string(TensorRTPrecisionMode, data_dict.get("precision_mode")),
+            # max_workspace_size=cls._parse_string(int, data_dict.get("max_workspace_size")),
+            trt_profiles=trt_profiles,
+            # optimization_level=cls._parse_string(int, data_dict.get("optimization_level")),
+            # compatibility_level=cls._parse_string(TensorRTCompatibilityLevel, data_dict.get("compatibility_level")),
+            # onnx_parser_flags=onnx_parser_flags,
+            # timing_cache_dir=data_dict.get("timing_cache_dir"),
+            model_path=data_dict.get("model_path"),
         )

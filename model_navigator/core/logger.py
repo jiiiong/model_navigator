@@ -60,19 +60,19 @@ class InterceptHandler(logging.Handler):
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
-@lru_cache
+@lru_cache(maxsize=128)
 def get_navigator_log_level() -> str:
     """Returns logging level."""
     return os.environ.get(NAVIGATOR_LOG_LEVEL_ENV, "INFO").upper()
 
 
-@lru_cache
+@lru_cache(maxsize=128)
 def get_third_party_log_level() -> str:
     """Returns logging level."""
     return os.environ.get(NAVIGATOR_THIRD_PARTY_LOG_LEVEL_ENV, "WARNING").upper()
 
 
-@lru_cache
+@lru_cache(maxsize=128)
 def get_log_format():
     """Returns log format."""
     formats = {
@@ -112,7 +112,12 @@ def third_party_record_predicate(record: Dict) -> bool:
 
 def forward_python_logging_to_loguru() -> None:
     """Use intercept handler to capture all holds and forward to loguru."""
-    logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
+    # logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
+
+    logger = logging.getLogger()
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    logging.basicConfig(handlers=[InterceptHandler()], level=0)
 
 
 def forward_polygraphy_logging_to_python_logging() -> None:

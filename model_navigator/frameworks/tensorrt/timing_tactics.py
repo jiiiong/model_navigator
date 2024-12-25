@@ -248,7 +248,8 @@ class TimingCacheManager:
         self.cache = self._get_cache_by_type(cache_type)(model_name, cache_path, strategy)
 
     def _get_cache_by_type(self, cache_type: str) -> Type[ITimingCache]:
-        if cache_class := self._cache_classes.get(cache_type):
+        cache_class = self._cache_classes.get(cache_type)
+        if cache_class:
             return cache_class
         else:
             raise NotImplementedError(

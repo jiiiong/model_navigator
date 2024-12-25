@@ -24,7 +24,7 @@ from model_navigator.utils.format_helpers import is_source_format
 
 
 def default_runners(device_kind: DeviceKind) -> List[str]:
-    """Select default runners defined for the process.
+    """Select default runners defined for the device.
 
     Returns:
         List of default runners

@@ -20,7 +20,7 @@ from model_navigator.commands.copy.copy_model import CopyModel
 from model_navigator.commands.data_dump.samples import FetchInputModelData, FetchOutputModelData
 from model_navigator.commands.infer_metadata import InferInputMetadata, InferOutputMetadata
 from model_navigator.commands.load import LoadMetadata
-from model_navigator.configuration import Format
+from model_navigator.configuration import Format, DeviceKind
 from model_navigator.configuration.common_config import CommonConfig
 from model_navigator.configuration.model.model_config import ModelConfig
 from model_navigator.pipelines.constants import PIPELINE_PREPROCESSING
@@ -43,29 +43,35 @@ def preprocessing_builder(config: CommonConfig, models_config: Dict[Format, List
     Returns:
         Pipeline with steps for profiling.
     """
+    # 获得当前 framework 下的 base model
     format = FRAMEWORK2BASE_FORMAT[config.framework]
     model_config = models_config[format][0] if models_config[format] else None
-    # 获得能够运行当前 format 的 runner
+
+    # 获得能够在 local_device 上运行 format 的 runner
     runners = get_format_default_runners(format)
+    local_device = DeviceKind.CPU if config.target_device == DeviceKind.MLU else config.target_device
+    runner_available_on_device = filter(
+        lambda runner: local_device in runner.devices_kind(),
+        runners
+    )
 
     execution_units: List[ExecutionUnit] = []
-    for runner in runners:
-        if config.target_device in runner.devices_kind():
-            # from_source 代表当前没有导入部分处理的 package
-            if config.from_source:
-                runner_config = getattr(model_config, "runner_config", None)
-                execution_units.extend([
-                    ExecutionUnit(command=InferInputMetadata),
-                    ExecutionUnit(command=FetchInputModelData),
-                    ExecutionUnit(command=InferOutputMetadata, runner_config=runner_config, runner_cls=runner),
-                    ExecutionUnit(command=FetchOutputModelData, runner_config=runner_config, runner_cls=runner),
-                ])
-            else:
-                execution_units.extend([ExecutionUnit(command=LoadMetadata)])
+    for runner in runner_available_on_device:
+        # from_source 代表当前没有导入部分处理的 package
+        if config.from_source:
+            runner_config = getattr(model_config, "runner_config", None)
+            execution_units.extend([
+                ExecutionUnit(command=InferInputMetadata),
+                ExecutionUnit(command=FetchInputModelData),
+                ExecutionUnit(command=InferOutputMetadata, runner_config=runner_config, runner_cls=runner),
+                ExecutionUnit(command=FetchOutputModelData, runner_config=runner_config, runner_cls=runner),
+            ])
+        else:
+            execution_units.extend([ExecutionUnit(command=LoadMetadata)])
 
-            if format in (Format.ONNX, Format.TENSORRT):
-                execution_units.append(ExecutionUnit(command=CopyModel, model_config=model_config))
+        if format in (Format.ONNX, Format.TENSORRT):
+            execution_units.append(ExecutionUnit(command=CopyModel, model_config=model_config))
 
-            break
+        break
 
     return Pipeline(name=PIPELINE_PREPROCESSING, execution_units=execution_units)

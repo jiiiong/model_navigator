@@ -95,6 +95,7 @@ def get_base_format(format: Format, framework: Framework) -> Optional[Format]:
         Framework.TORCH: {
             Format.TENSORRT: Format.ONNX,
             Format.TORCH_TRT: Format.TORCH_EXPORTEDPROGRAM,
+            Format.MAGICMIND: Format.ONNX,
         },
         Framework.TENSORFLOW: {
             Format.ONNX: Format.TF_SAVEDMODEL,
@@ -125,6 +126,7 @@ def get_export_formats(format: Format, framework: Framework) -> List[Format]:
         Framework.NONE: {},
         Framework.TORCH: {
             Format.TENSORRT: [Format.TORCHSCRIPT, Format.ONNX],
+            Format.MAGICMIND: [Format.TORCHSCRIPT, Format.ONNX],
             Format.TORCH_TRT: [Format.TORCHSCRIPT],
         },
         Framework.TENSORFLOW: {
@@ -156,6 +158,7 @@ FORMAT2SUFFIX = {
         Format.TF_TRT: ".savedmodel",
         Format.TORCH_TRT: ".ep",
         Format.TORCH_EXPORTEDPROGRAM: ".pt2",
+        Format.MAGICMIND: ".mm",
     },
 }
 

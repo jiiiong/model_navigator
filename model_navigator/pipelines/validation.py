@@ -14,7 +14,8 @@
 """Pipeline manager submodule."""
 
 import warnings
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union, get_args, get_origin
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing_extensions import get_args, get_origin
 
 from model_navigator.configuration import (
     AVAILABLE_TARGET_FORMATS,

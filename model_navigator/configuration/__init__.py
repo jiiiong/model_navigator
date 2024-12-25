@@ -30,13 +30,12 @@ from typing import (
     List,
     Mapping,
     Optional,
-    Protocol,
     Sequence,
     Tuple,
     Type,
     Union,
-    runtime_checkable,
 )
+from typing_extensions import Protocol, runtime_checkable
 
 import numpy as np
 
@@ -61,7 +60,9 @@ Sample = Dict[str, np.ndarray]
 
 VerifyFunction = Callable[[Iterable[Sample], Iterable[Sample]], bool]
 
-
+#####################################################################################
+# device          ###################################################################
+#####################################################################################
 class DeviceKind(Enum):
     """Supported types of devices.
 
@@ -72,7 +73,11 @@ class DeviceKind(Enum):
 
     CPU = "cpu"
     CUDA = "cuda"
+    MLU = 'mlu370'
 
+#####################################################################################
+# dataloader          ###############################################################
+#####################################################################################
 
 @runtime_checkable
 class SizedIterable(Protocol):
@@ -97,6 +102,9 @@ class SizedIterable(Protocol):
 
 SizedDataLoader = Union[SizedIterable, Sequence]
 
+#####################################################################################
+#  Format         ###################################################################
+#####################################################################################
 
 class Format(Enum):
     """All model formats supported by Model Navigator 'optimize' function.
@@ -125,7 +133,12 @@ class Format(Enum):
     TORCH_TRT = "torch-trt"
     ONNX = "onnx"
     TENSORRT = "trt"
+    MAGICMIND = 'magicmind'
 
+
+#####################################################################################
+# format related config    ##########################################################
+#####################################################################################
 
 class JitType(Enum):
     """TorchScript export parameter.
@@ -206,6 +219,18 @@ class TensorRTCompatibilityLevel(Enum):
     AMPERE_PLUS = "ampere_plus"
 
 
+class MagicMindPrecision(Enum):
+    """Precisions supported during MagicMind conversions.
+    """
+
+    FP16 = 'force_float16'
+    FP32 = "force_float32"
+    INT8_MIX_FP16 = "qint8_mixed_float16"
+    INT8_MIX_FP32 = "qint8_mixed_float32"
+    INT16_MIX_FP16 = "qint16_mixed_float16"
+    INT16_MIX_FP32 = "qint16_mixed_float32"
+
+
 @dataclasses.dataclass
 class ShapeTuple(DataObject):
     """Represents a set of shapes for a single binding in a profile.
@@ -234,6 +259,10 @@ class ShapeTuple(DataObject):
         """Iterate over shapes."""
         yield from [self.min, self.opt, self.max]
 
+
+#####################################################################################
+#  Optimization Porfile         #####################################################
+#####################################################################################
 
 @dataclasses.dataclass
 class OptimizationProfile(DataObject):
@@ -430,6 +459,10 @@ class TensorRTProfile(Dict[str, ShapeTuple]):
         return "{" + sep.join(elems) + "}"
 
 
+#####################################################################################
+# format type: source vs serialized          ########################################
+#####################################################################################
+
 SERIALIZED_FORMATS = (
     Format.TORCHSCRIPT,
     Format.TF_SAVEDMODEL,
@@ -437,6 +470,7 @@ SERIALIZED_FORMATS = (
     Format.TORCH_TRT,
     Format.ONNX,
     Format.TENSORRT,
+    Format.MAGICMIND,
 )
 
 SOURCE_FORMATS = (
@@ -463,6 +497,10 @@ EXPORT_FORMATS = {
     Framework.TENSORRT: [Format.TENSORRT],
 }
 
+#####################################################################################
+# default taget formats                      ########################################
+#####################################################################################
+
 DEFAULT_NONE_FRAMEWORK_TARGET_FORMATS = (Format.PYTHON,)
 
 DEFAULT_JAX_TARGET_FORMATS = (
@@ -483,6 +521,13 @@ DEFAULT_TORCH_TARGET_FORMATS = (
     Format.ONNX,
     Format.TORCH_TRT,
     Format.TENSORRT,
+)
+
+DEFAULT_TORCH_TARGET_FORMATS_FOR_MLU = (
+    Format.TORCHSCRIPT,
+    Format.TORCH_EXPORTEDPROGRAM,
+    Format.ONNX,
+    Format.MAGICMIND,
 )
 
 DEFAULT_TORCH_TARGET_FORMATS_FOR_PROFILING = (
@@ -535,12 +580,22 @@ DEFAULT_TENSORRT_PRECISION = (
     TensorRTPrecision.FP32,
     TensorRTPrecision.FP16,
 )
+
+DEFAULT_MAGICMIND_PRECISION = (
+    MagicMindPrecision.FP32,
+    MagicMindPrecision.FP16,
+)
+
 DEFAULT_TENSORRT_PRECISION_MODE = TensorRTPrecisionMode.HIERARCHY
 
 TensorRTPrecisionType = Union[Union[str, TensorRTPrecision], Tuple[Union[str, TensorRTPrecision], ...]]
 TensorRTPrecisionModeType = Union[str, TensorRTPrecisionMode]
 
+MagicMindPrecisionType = Union[Union[str, MagicMindPrecision], Tuple[Union[str, MagicMindPrecision], ...]]
 
+#####################################################################################
+# customConfig: 用于配置每个模型格式特有的属性          ###############################
+#####################################################################################
 class CustomConfig(abc.ABC):
     """Base class used for custom configs. Input for Model Navigator `optimize` method."""
 
@@ -578,6 +633,48 @@ class CustomConfigForFormat(DataObject, CustomConfig):
         """Format represented by CustomConfig."""
         raise NotImplementedError()
 
+
+
+@dataclasses.dataclass
+class MagicMindConfig(CustomConfigForFormat):
+    """Abstract base class used for custom configs representing particular MagicMind format."""
+    # 更多参数：https://www.cambricon.com/docs/sdk_1.15.0/magicmind_1.7.0/developer_guide_python/autosummary/magicmind.python.runtime.builder.BuilderConfig.html
+    # 动态输入：dim_range, graph_shape_mutable
+    trt_profiles: Optional[List[TensorRTProfile]] = None
+    # 精度配置，混合精度需要量化
+    precision: MagicMindPrecisionType = DEFAULT_MAGICMIND_PRECISION
+    # computation_preference: auto, high_precision, fast
+    # opt_config
+    # precision_mode: TensorRTPrecisionModeType = DEFAULT_TENSORRT_PRECISION_MODE
+    # max_workspace_size: Optional[int] = DEFAULT_MAX_WORKSPACE_SIZE
+    # run_max_batch_size_search: Optional[bool] = None  # TODO this parameter is currently not used
+
+    def __post_init__(self):
+        """Initialize common TensorRT parameters and validate configuration."""
+        precision = (self.precision,) if not isinstance(self.precision, (list, tuple)) else self.precision
+        self.precision = tuple(MagicMindPrecision(p) for p in precision)
+        # self.precision_mode = TensorRTPrecisionMode(self.precision_mode)
+
+    def defaults(self) -> None:
+        """Update parameters to defaults."""
+        self.precision = tuple(TensorRTPrecision(p) for p in DEFAULT_TENSORRT_PRECISION)
+        self.trt_profiles = None
+        # self.run_max_batch_size_search = None
+        # self.max_workspace_size = DEFAULT_MAX_WORKSPACE_SIZE
+
+    @property
+    def format(self) -> Format:
+        """Returns Format.TORCH.
+
+        Returns:
+            Format.TORCH
+        """
+        return Format.MAGICMIND
+
+    @classmethod
+    def name(cls) -> str:
+        """Name of the config."""
+        return "MagicMind"
 
 @dataclasses.dataclass
 class CustomConfigForTensorRT(CustomConfigForFormat):

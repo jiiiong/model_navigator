@@ -13,7 +13,7 @@
 # limitations under the License.
 """Runners global registry."""
 
-import importlib.metadata
+import importlib_metadata
 import sys
 from typing import Dict, Optional, Type, Union
 
@@ -27,8 +27,9 @@ runner_registry: Dict[str, Type[NavigatorRunner]] = {}
 def load_runners_from_entry_points():
     """Load runners from package entrypoints."""
     if sys.version_info < (3, 10):
-        entry_points = importlib.metadata.entry_points()
-        model_navigator_entry_points = entry_points.get("model_navigator", [])
+        model_navigator_entry_points = importlib_metadata.entry_points(group="model_navigator")
+        # entry_points = importlib_metadata.entry_points()
+        # model_navigator_entry_points = entry_points.get("model_navigator", [])
     else:
         model_navigator_entry_points = importlib.metadata.entry_points(group="model_navigator")
 

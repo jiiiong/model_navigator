@@ -37,6 +37,10 @@ def _get_custom_config(
     custom_config_cls: Type[C],
     framework: Optional[Framework] = None,
 ) -> C:
+    """
+    从 custom_configs 中找到类型为 custom_config_cls 的，
+    如果为空，则使用 custom_configs 新建一个默认的。
+    """
     for custom_config in custom_configs:
         if isinstance(custom_config, custom_config_cls):
             return custom_config
@@ -78,13 +82,16 @@ class ModelConfigBuilder:
             else:
                 raise NotImplementedError("Currently only custom configs for formats are implemented.")
 
+        # 根据当前 framework 和 期望的 target_formats，计算所有转换路径上的 model_formats
         base_formats = []
         export_formats = []
         for target_format in target_formats:
+            # base 指的是将 framework 中的模型转换到 target_format 一般需要的导出格式
             base_format = get_base_format(target_format, framework)
             if base_format is not None:
                 base_formats.append(base_format)
-
+            # export_fmts 是将 framework 中的模型格式，转换到 target_format 时，
+            # framework 需要导出的格式
             export_fmts = get_export_formats(target_format, framework)
             export_formats.extend(export_fmts)
 
@@ -103,6 +110,7 @@ class ModelConfigBuilder:
             if trt_config.model_path is not None:
                 target_formats = tuple(set(target_formats) - TRT_INPLACE_FORMATS_TO_REMOVE)
 
+        # 为每一个 format 获得默认的 model_config
         model_configs = collections.defaultdict(list)
         if Format.PYTHON in target_formats:
             ModelConfigBuilder.get_source_python_config(model_configs)
@@ -183,6 +191,13 @@ class ModelConfigBuilder:
 
         if Format.TF_TRT in target_formats:
             ModelConfigBuilder.get_tf_trt_config(
+                custom_configs=custom_configs_for_format,
+                model_configs=model_configs,
+            )
+
+        if Format.MAGICMIND in target_formats:
+            ModelConfigBuilder.get_magicmind_config(
+                framework=framework,
                 custom_configs=custom_configs_for_format,
                 model_configs=model_configs,
             )
@@ -484,3 +499,30 @@ class ModelConfigBuilder:
                         model_path=trt_config.model_path,
                     )
                 )
+
+    @staticmethod
+    def get_magicmind_config(
+        framework: Framework,
+        custom_configs: Sequence[config_api.CustomConfigForFormat],
+        model_configs: Dict[Format, List[model_config.ModelConfig]],
+    ):
+        """Append MagicMind model configurations to model_configs dictionary.
+
+        Args:
+            framework: source framework
+            custom_configs: Format configurations provided by the user
+            model_configs: Dictionary mapping model formats to lists of model configs
+        """
+        parent_formats = model_configs[Format.ONNX] + model_configs[Format.TORCHSCRIPT]
+        # custom_config 中为期望的 model 配置
+        magicmind_config = _get_custom_config(custom_configs, config_api.MagicMindConfig)
+        for model_configuration, precision in product(parent_formats, magicmind_config.precision):
+            model_configs[Format.MAGICMIND].append(
+                model_config.MagicMindModelConfig(
+                    parent=model_configuration,
+                    precision=precision,
+                    trt_profiles=magicmind_config.trt_profiles,
+                    custom_args=magicmind_config.custom_args,
+                    device=magicmind_config.device,
+                )
+            )

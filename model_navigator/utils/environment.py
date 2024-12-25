@@ -207,13 +207,13 @@ def _remove(input: str, regex: str) -> str:
     return re.sub(regex, "", input).strip()
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def use_multiprocessing() -> bool:
     """Return flag whether to run subcommands in parent process."""
     return os.environ.get(NAVIGATOR_USE_MULTIPROCESSING, "True").upper() == "TRUE"
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def get_console_output() -> str:
     """Returns what should be put on the console."""
     return os.environ.get(NAVIGATOR_CONSOLE_OUTPUT_ENV, OUTPUT_SIMPLE_REPORT).upper()

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 [project]
-name = "triton-model-navigator"
+name = "model-navigator"
 readme = "docs/pypi.rst"
 description = "Triton Model Navigator: An inference toolkit for optimizing and deploying machine learning models and pipelines on the Triton Inference Server and PyTriton."
 dynamic = ["version"]

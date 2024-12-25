@@ -15,7 +15,8 @@
 
 import functools
 import pathlib
-from typing import Any, Callable, List, Literal, Optional, Union
+from typing import Any, Callable, List, Optional, Union
+from typing_extensions import Literal
 
 import wrapt
 
@@ -297,7 +298,7 @@ class Module(wrapt.ObjectProxy):
             package = self._wrapper.packages[package_idx]
         except IndexError as e:
             raise ModelNavigatorUserInputError(
-                f"Incorrect package index {package_idx=} for module {self.name}. There are only {len(self._wrapper.packages)} packages."
+                f"Incorrect package index package_idx={package_idx} for module {self.name}. There are only {len(self._wrapper.packages)} packages."
             ) from e
 
         model_name = model_name or self.name
