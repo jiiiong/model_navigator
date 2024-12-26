@@ -20,6 +20,9 @@ setup(
         'wrapt',
         'tritonclient[grpc]',
         'polygraphy',
-        'tritonclient==2.49.0',
+        'tritonclient==2.45.0',
+        'onnx_graphsurgeon',
+        'colored',
+        'onnxruntime',
     ],
 )

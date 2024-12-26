@@ -90,6 +90,9 @@ class ExportTorch2TorchScript(Command):
             raise RuntimeError("Expected model of type torch.nn.Module. Got None instead.")
 
         # 调整模型运行的硬件
+        if (target_device == DeviceKind.MLU):
+            target_device = DeviceKind.CPU
+
         model.to(target_device.value)
 
         exporters.torch2torchscript.get_model = lambda: model
@@ -199,6 +202,10 @@ class ExportTorch2ONNX(Command):
 
         # 获得模型
         exporters.torch2onnx.get_model = lambda: model
+
+        #
+        if target_device == DeviceKind.MLU:
+            target_device = DeviceKind.CPU
 
         # Keep model on CPU after operation
         def on_exit():

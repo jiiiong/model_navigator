@@ -75,6 +75,7 @@ class ModelConfigBuilder:
         Returns:
             Dictionary with mapping of Formats to lists of ModelConfigs
         """
+        # custom_config 是用户提供的，针对转换路径上模型的自定义配置，
         custom_configs_for_format: List[config_api.CustomConfigForFormat] = []
         for custom_config in custom_configs or []:
             if isinstance(custom_config, config_api.CustomConfigForFormat):
@@ -82,7 +83,9 @@ class ModelConfigBuilder:
             else:
                 raise NotImplementedError("Currently only custom configs for formats are implemented.")
 
-        # 根据当前 framework 和 期望的 target_formats，计算所有转换路径上的 model_formats
+        ###################################################################################
+        # 根据当前 framework 和 target_formats，计算所有转换路径上的 model_formats ###########
+        ###################################################################################
         base_formats = []
         export_formats = []
         for target_format in target_formats:
@@ -96,7 +99,9 @@ class ModelConfigBuilder:
             export_formats.extend(export_fmts)
 
         target_formats = tuple(set(base_formats + export_formats + list(target_formats)))
-
+        ##############################################################################
+        ######### 和 inplace 相关
+        ##############################################################################
         # if model_path provided for onnx or trt inplace, remove other formats to avoid unnecessary conversions
         if custom_configs:
             onnx_config = _get_custom_config(
@@ -110,6 +115,11 @@ class ModelConfigBuilder:
             if trt_config.model_path is not None:
                 target_formats = tuple(set(target_formats) - TRT_INPLACE_FORMATS_TO_REMOVE)
 
+        ##############################################################################
+        ######## 为所有 target format 配置默认的 model confis，用于 导出，转换等 ########
+        ######## 其中，model config 是从 custom config 转换来的            ############
+        ######## 如果没有 custom config，那么就新建一个默认的                 ##########
+        ##############################################################################
         # 为每一个 format 获得默认的 model_config
         model_configs = collections.defaultdict(list)
         if Format.PYTHON in target_formats:
@@ -127,6 +137,9 @@ class ModelConfigBuilder:
         if Format.JAX in target_formats:
             ModelConfigBuilder.get_source_jax_config(model_configs)
 
+        # 对于 torchscript 的 model config，存在两种情况需要添加
+        # 1. torchscript 在 target format 中
+        # 2. onnx_extened_conversion 处于开启状态，即除了直接从 torch 导出 onnx，还需要首先导出 torchscript，将其转换为 onnx
         onnx_custom_config = _get_custom_config(custom_configs_for_format, config_api.OnnxConfig, framework=framework)
         extended_onnx_export = Format.ONNX in target_formats and onnx_custom_config.onnx_extended_conversion
         if framework == Framework.TORCH and (Format.TORCHSCRIPT in target_formats or extended_onnx_export):
@@ -391,6 +404,7 @@ class ModelConfigBuilder:
             custom_configs: Format configurations provided by the user
             model_configs: Dictionary mapping model formats to lists of model configs
         """
+        # TODO 修改 default opset
         onnx_config = _get_custom_config(custom_configs=custom_configs, custom_config_cls=config_api.OnnxConfig)
         if framework in (Framework.TENSORFLOW, Framework.JAX):
             for model_configuration in model_configs[Format.TF_SAVEDMODEL]:

@@ -24,6 +24,7 @@ from model_navigator.pipelines.builders.performance import performance_builder  
 from model_navigator.pipelines.builders.preprocessing import preprocessing_builder  # noqa: F401
 from model_navigator.pipelines.builders.verify import verify_builder  # noqa: F401
 from model_navigator.pipelines.pipeline import Pipeline  # noqa: F401
+from model_navigator.pipelines.builders.magicmind import magicmind_conversion_builder
 
 if is_torch_available():
     from .torch import torch_conversion_builder, torch_export_builder  # noqa: F401

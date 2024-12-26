@@ -521,12 +521,12 @@ DEFAULT_TORCH_TARGET_FORMATS = (
     Format.ONNX,
     Format.TORCH_TRT,
     Format.TENSORRT,
+    Format.MAGICMIND,
 )
 
 DEFAULT_TORCH_TARGET_FORMATS_FOR_MLU = (
-    Format.TORCHSCRIPT,
-    Format.TORCH_EXPORTEDPROGRAM,
-    Format.ONNX,
+    # Format.TORCHSCRIPT,
+    # Format.ONNX,
     Format.MAGICMIND,
 )
 

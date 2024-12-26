@@ -69,6 +69,9 @@ class ConvertTorchScript2ONNX(Command):
         converted_model_path = workspace.path / path
         converted_model_path.parent.mkdir(parents=True, exist_ok=True)
 
+        if target_device == DeviceKind.MLU:
+            target_device = DeviceKind.CPU
+
         with ExecutionContext(
             workspace=workspace,
             script_path=converted_model_path.parent / "reproduce_conversion.py",

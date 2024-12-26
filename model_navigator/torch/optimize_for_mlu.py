@@ -40,6 +40,7 @@ from model_navigator.pipelines.builders import (
     performance_builder,
     preprocessing_builder,
     tensorrt_conversion_builder,
+    magicmind_conversion_builder,
     torch_conversion_builder,
     torch_export_builder,
     torch_tensorrt_conversion_builder,
@@ -104,12 +105,16 @@ def optimize(
         Package descriptor representing created package.
     """
 
+    ################################################
+    ## 参数检查, 并提供默认选择 ######################
+    ################################################
+
     # 确定 target formats
     if target_formats is None:
         target_formats = DEFAULT_TORCH_TARGET_FORMATS_FOR_MLU
         LOGGER.info(f"Using default target formats: {[tf.name for tf in target_formats]}")
 
-    # TODO 这里的 default_runner 是干嘛用的？
+    # TODO 这里的 default_runner 是干嘛用的？ #########################################################
     if runners is None:
         runners = default_runners(device_kind=target_device)
     else:
@@ -145,6 +150,9 @@ def optimize(
         custom_configs=map_custom_configs(custom_configs=custom_configs),
     )
 
+    #######################################################################
+    ###### 构建转换路径上所有 model #### ####################################
+    #######################################################################
     # 根据 target_device 和 target_format 决定转换路径上所有可能的 model
     # 用 model_configs 来表示这些 model，model_config 还决定了 export 或者 convert 时使用的参数
     # 如果用户提供了 custom_config，则使用 custom_config
@@ -167,6 +175,8 @@ def optimize(
         # torch_conversion_builder, #
         # torch_tensorrt_conversion_builder, #
         # tensorrt_conversion_builder, #
+        magicmind_conversion_builder, # 将 onnx 转换为 magicmind
+
         # # 使用 runner 进行 Model 的正确性校验与性能采样
         # correctness_builder, #
         # performance_builder, #

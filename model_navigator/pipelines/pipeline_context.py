@@ -215,7 +215,8 @@ class PipelineContext:
 
     def initialize(self):
         """Initialize context file."""
-        self._file.unlink(missing_ok=True)
+        if self._file.exists() and self._file.is_file():
+            self._file.unlink()
         self._file.touch()
 
     def load(self):

@@ -50,7 +50,7 @@ class PipelineManagerConfigurationValidator:
             config: A configuration object
             package: Package to be optimized, if None package is yet to be built. Defaults to None.
         """
-        cls._validate_if_runners_are_not_empty(config)
+        # cls._validate_if_runners_are_not_empty(config)
         cls._validate_config_types(config)
         cls._validate_if_custom_configs_match_target_formats(config)
         cls._validate_if_target_formats_match_framework(config)
